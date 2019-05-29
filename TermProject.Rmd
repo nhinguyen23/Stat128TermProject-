@@ -1,0 +1,127 @@
+---
+title: "Term Project"
+author: "Nhi Soria"
+date: "May 16, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Problem 1
+For each of the rougly 193,000 course sections in this dataset, calculate the average of the course grades assigned (average gpa of the section). Explain how you handled non-letter grades such as `nr'and `cr.'
+```{r}
+#Load dataframes
+sections <- read.csv("C:/Users/nhing/Desktop/uw-madison-courses/sections.csv")
+
+teachings <- read.csv("C:/Users/nhing/Desktop/uw-madison-courses/teachings.csv")
+
+grades <- read.csv("C:/Users/nhing/Desktop/uw-madison-courses/grade_distributions.csv") 
+
+instructors<-read.csv("C:/Users/nhing/Desktop/uw-madison-courses/instructors.csv")
+
+schedules<-read.csv("C:/Users/nhing/Desktop/uw-madison-courses/schedules.csv")
+
+course.offerings<-read.csv("C:/Users/nhing/Desktop/uw-madison-courses/course_offerings.csv")
+
+#Merge grades and section
+grades.and.section <- merge(grades, sections, by.x=c
+  ('course_offering_uuid', 'section_number'), by.y=c('course_offering_uuid', 'number'))
+#Merge grade, section and teachings(instructor)
+grades.section.teach <- merge(grades.and.section, teachings, 
+                              by.x='uuid', by.y='section_uuid')
+
+##Total students of each class
+grades.section.teach$tot.students<- apply(grades.section.teach[ ,4:10], 
+                                          MARGIN=1,FUN=sum)
+
+#convert number grades from letter grades. I don't count "nr", "cr" and so on
+
+grades.section.teach$a.point<-grades.section.teach$a_count*4
+grades.section.teach$ab_point<-grades.section.teach$ab_count*3.5
+grades.section.teach$b_point<-grades.section.teach$b_count*3
+grades.section.teach$bc_point<-grades.section.teach$bc_count*2.5
+grades.section.teach$c_point<-grades.section.teach$c_count*2
+grades.section.teach$d_point<-grades.section.teach$d_count*1
+grades.section.teach$f_point<-grades.section.teach$f_count*0
+
+
+#Obtain average(avg) gpa for each class
+grades.section.teach$avg.gpa<-apply(grades.section.teach[ ,25:31],MARGIN = 1, FUN =
+                                       sum)/grades.section.teach$tot.students
+summary(grades.section.teach$avg.gpa)
+```
+
+#Problem 2 
+Are there any courses, sections or subjects that stand out as having the lowest averagegpa or the highest average gpa?
+```{r}
+#Dataframe of highest gpa
+highest.gpa<-subset(grades.section.teach,grades.section.teach$avg.gpa==4)
+#Frequency of highest grade by section type
+library(plyr)
+count(highest.gpa$section_type)
+#Dataframe of lowest gpa
+lowest.gpa<-subset(grades.section.teach, grades.section.teach$avg.gpa==0)
+count(lowest.gpa$section_type)
+```
+
+#Problem 3
+Do the grades given by individual instructors seem to stay the same over time or do they have any type of trend over time? If there is a trend, is it consistent across instructors or does in vary among instructors?
+```{r}
+#Merging dataframes instructors with grades.section.teach
+instructors.grades<- merge(grades.section.teach,instructors, by.x = "instructor_id", by.y = "id")
+#Merging dataframes schdules to instructors.grades
+schedules.instructors.grades<-merge(instructors.grades,schedules,by.x = "schedule_uuid", by.y = "uuid")
+#Merging course_offering to current data frame
+course.schedules.instructors<-merge(schedules.instructors.grades,course.offerings,by.x = 
+                  "course_offering_uuid", by.y="uuid")
+#Choose randomly professors. Then we can plot their gpa over time
+head(summary(course.schedules.instructors$name.x))
+#Extract data of Donald Yandow
+Donald.Yandow<-subset(course.schedules.instructors, course.schedules.instructors$name.x=="DONALD YANDOW")
+plot(x=Donald.Yandow$term_code,y=Donald.Yandow$avg.gpa)
+#Extract data of Nicholas Hill
+Nicholas.Hill<-subset(course.schedules.instructors,course.schedules.instructors$name.x=="NICHOLAS HILL")
+plot(x=Nicholas.Hill$term_code,y=Nicholas.Hill$avg.gpa)
+#Extract data of Christine Seibert
+Christine.Seibert<-subset(course.schedules.instructors,course.schedules.instructors$name.x=="CHRISTINE SEIBERT")
+plot(x=Christine.Seibert$term_code, y=Christine.Seibert$avg.gpa)
+```
+
+#Conclusion
+There is no pattern of gpa over time by professor
+
+#Problem 4
+Which 5 subject areas had the most professors in 2017? Pick a subject area with many professors. Scrape data on the professors' ratings from ratemyprofessor.com and determine if these ratings have any correlation with the overall average gpa assigned by the professor over a reasonable time period.
+```{r}
+#checking how many course offer each term in 2017
+sum(course.schedules.instructors$term_code==1174)
+sum(course.schedules.instructors$term_code==1182)
+sum(course.schedules.instructors$term_code==1176)
+#subsetting spring, fall, summer 2017 classes
+spring17<- subset(course.schedules.instructors,course.schedules.instructors$term_code==1174)
+fall17<- subset(course.schedules.instructors,course.schedules.instructors$term_code==1182)
+summer<-subset(course.schedules.instructors,course.schedules.instructors$term_code==1176)
+# there is no course in summer 2017
+
+#5 subject areas had the most professor. 
+head(summary(spring17$name.y))
+#most 5 suject areas in fall 2017
+head(summary(fall17$name.y))
+#Pick research for subject area with many professors. Choose random professors teach Research 
+x<-subset(spring17, spring17$name.y== "Research")
+head(summary(x$name.x))
+
+y<-subset(fall17,fall17$name.y=="Research")
+head(summary(y$name.x))
+```
+
+#Problem5
+Construct an interesting data visualization from this dataset. It should include 4 or more variables and use some complex graphing features such as faceting, multiple groups or lines in the same pane, or a new type of graph that was not illustrated in class. What interesting finding emerges from your graph?
+```{r}
+course.schedules.instructors$term_code<- factor(course.schedules.instructors$term_code)
+course.schedules.instructors$avg.gpa<-factor(course.schedules.instructors$avg.gpa)
+course.schedules.instructors$avg.gpa[is.na(course.schedules.instructors$avg.gpa)]<-0
+
+```
